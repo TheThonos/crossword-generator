@@ -38,7 +38,7 @@ public class CrosswordGenerator extends Application {
     public void start(Stage stage) {
         crosswordGrid = new ArrayList<>();
         this.gridpane = new GridPane();
-        VBox vbox = new VBox();
+        HBox vbox = new HBox();
         vbox.setAlignment(Pos.CENTER);
         HBox horizontalCenterContainer = new HBox();
         horizontalCenterContainer.setAlignment(Pos.CENTER);
@@ -57,8 +57,10 @@ public class CrosswordGenerator extends Application {
         }
 
         // Width and Height options
-        HBox widthAndHeightContainer = new HBox();
+        VBox widthAndHeightContainer = new VBox();
         widthAndHeightContainer.setAlignment(Pos.CENTER);
+        HBox sizeContainer = new HBox();
+        Label sizeLabel = new Label("Size: ");
         TextField widthInput = new TextField(String.valueOf(this.width));
         widthInput.setMinWidth(30);
         widthInput.textProperty().addListener((observable, oldValue, newValue) -> {
@@ -72,19 +74,58 @@ public class CrosswordGenerator extends Application {
         resizeButton.setOnAction(actionEvent -> {
             this.resize(Integer.parseInt(widthInput.getText()));
         });
+        sizeContainer.getChildren().addAll(sizeLabel, widthInput, resizeButton);
+        sizeContainer.setAlignment(Pos.CENTER_LEFT);
+        sizeContainer.setSpacing(5);
+        HBox frequencyContainer = new HBox();
+        Label frequencyLabel = new Label("Minimum word frequency (0-9): ");
+        TextField frequencyInput = new TextField(String.valueOf(8));
+        frequencyInput.setMinWidth(30);
+        frequencyInput.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.matches("\\d*")) {
+                frequencyInput.setText(newValue.replaceAll("\\D", ""));
+            } else if(newValue.length() > 1) {
+                frequencyInput.setText(newValue.substring(0, 1));
+            }
+        });
+        frequencyContainer.getChildren().addAll(frequencyLabel, frequencyInput);
+        frequencyContainer.setAlignment(Pos.CENTER_LEFT);
+        frequencyContainer.setSpacing(5);
+        HBox buttonContainer = new HBox();
         Button generateButton = new Button("Generate Grid");
         generateButton.setOnAction(actionEvent -> {
             try {
-                this.generate();
+                this.generate(Integer.parseInt(frequencyInput.getText()));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         });
+        Button clearWordsButton = new Button("Clear Words");
+        clearWordsButton.setOnAction(actionEvent -> {
+            gridpane.getChildren().forEach(node -> {
+                TextField textField = (TextField) node;
+                textField.textProperty().setValue("");
+            });
+        });
+        Button clearGridButton = new Button("Clear Grid");
+        clearGridButton.setOnAction(actionEvent -> {
+            gridpane.getChildren().forEach(node -> {
+                TextField textField = (TextField) node;
+                textField.textProperty().setValue("");
+                textField.setStyle(WHITE_STYLE);
+            });
+        });
+        buttonContainer.setSpacing(5);
+        buttonContainer.getChildren().addAll(generateButton, clearWordsButton, clearGridButton);
         widthAndHeightContainer.setPadding(new Insets(10));
         widthAndHeightContainer.setSpacing(5);
-        widthAndHeightContainer.getChildren().addAll(widthInput, resizeButton, generateButton);
+        widthAndHeightContainer.getChildren().addAll(sizeContainer, frequencyContainer, buttonContainer);
         vbox.getChildren().addAll(gridpane, widthAndHeightContainer);
         horizontalCenterContainer.getChildren().add(vbox);
+
+        //TODO: add field to set the amount of grids to generate
+        //TODO: add buttons to switch between grids, should looop when at end
+        //TODO: add indicator with current grid and total amount of girds
 
         stage.setTitle("Crossword Generator");
         stage.setScene(scene);
@@ -123,48 +164,7 @@ public class CrosswordGenerator extends Application {
                 }
             }
         });
-/*        textField.setOn(actionEvent -> {
-            System.out.println("Action");
-            System.out.println(actionEvent.getEventType());
-        });
-        textField.setOnDragDetected(new EventHandler<MouseEvent>() {
 
-            @Override
-            public void handle(MouseEvent event) {
-                // get a reference to the clicked DragIcon object
-                TextField icn = (TextField) event.getSource();
-
-                //begin drag ops
-                mDragOverIcon.setType(icn.getType());
-                mDragOverIcon.relocateToPoint(new Point2D (event.getSceneX(), event.getSceneY()));
-
-                ClipboardContent content = new ClipboardContent();
-                content.putString(icn.getType().toString());
-
-                mDragOverIcon.startDragAndDrop (TransferMode.ANY).setContent(content);
-                mDragOverIcon.setVisible(true);
-                mDragOverIcon.setMouseTransparent(true);
-                if (icn.getStyle().equals("-fx-base: white")) {
-                    textField.setStyle("-fx-control-inner-background: #000000");
-                    textField.setEditable(false);
-                } else {
-                    textField.setStyle("-fx-control-inner-background: #FFFFFF");
-                    textField.setEditable(true);
-                }
-                event.consume();
-            }
-        });
-        textField.setOnDragDetected(actionEvent -> {
-            if(actionEvent.isSecondaryButtonDown()) {
-                if (textField.getStyle().equals("-fx-base: white")) {
-                    textField.setStyle("-fx-control-inner-background: #000000");
-                    textField.setEditable(false);
-                } else {
-                    textField.setStyle("-fx-control-inner-background: #FFFFFF");
-                    textField.setEditable(true);
-                }
-            }
-        });*/
         return textField;
     }
 
@@ -223,7 +223,7 @@ public class CrosswordGenerator extends Application {
         this.width = width;
     }
 
-    private void generate() throws IOException {
+    private void generate(int frequency) throws IOException {
         this.crosswordGrid.clear();
         for (ArrayList<TextField> row : displayGrid) {
             ArrayList<Character> newRow = new ArrayList<>();
@@ -238,25 +238,14 @@ public class CrosswordGenerator extends Application {
             }
             this.crosswordGrid.add(newRow);
         }
-        for (ArrayList<Character> row : crosswordGrid) {
-            for (Character box : row) {
-                System.out.print(box + "  ");
-            }
-            System.out.println("|");
-        }
 
         GridSetup gridSetup = WordLoader.findLimits(this.crosswordGrid);
-        System.out.println("Across: " + gridSetup.wordPlacementsAcross().size());
-        System.out.println("Down: " + gridSetup.wordPlacementsDown().size());
 
-        ArrayList<Word> words = WordLoader.loadWordList(gridSetup);
+        ArrayList<Word> words = WordLoader.loadWordList(gridSetup, frequency);
         System.out.println(words.size());
 
-        System.out.println("Shortest: " + gridSetup.shortestWord());
-        System.out.println("Longest: " + gridSetup.longestWord());
-
         Generator gen = new Generator(words, gridSetup, this.crosswordGrid);
-        ArrayList<ArrayList<ArrayList<Character>>> output = gen.generate();
+        ArrayList<ArrayList<ArrayList<Character>>> output = gen.generate(1);
         System.out.println(output.getFirst());
         if(output.isEmpty()){
             Alert alert = new Alert(Alert.AlertType.ERROR, "No possible solution");
@@ -265,6 +254,11 @@ public class CrosswordGenerator extends Application {
                 return;
             }
         }
+
+        gridpane.getChildren().forEach(node -> {
+            TextField textField = (TextField) node;
+            textField.textProperty().setValue(output.getFirst().get(GridPane.getRowIndex(node)).get(GridPane.getColumnIndex(node)).toString());
+        });
 
     }
 

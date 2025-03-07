@@ -46,7 +46,7 @@ public class Generator {
         this.starterGrid = starterGrid;
     }
 
-    public ArrayList<ArrayList<ArrayList<Character>>> generate() {
+    public ArrayList<ArrayList<ArrayList<Character>>> generate(int gridsToGenerate) {
         ArrayList<ArrayList<ArrayList<Character>>> grids = new ArrayList<>();
 
         /*
@@ -62,7 +62,9 @@ public class Generator {
         * Goto step 1 with the next longest word
         *
         * */
-        boolean success = tryWord(0, starterGrid);
+
+        ArrayList<ArrayList<Character>> copy = deepClone(starterGrid);
+        boolean success = tryWord(0, deepClone(copy));
         System.out.println("\n");
 
         for (ArrayList<Character> row : this.starterGrid) {
@@ -72,12 +74,32 @@ public class Generator {
             System.out.println("|");
         }
 
+        grids.add(starterGrid);
+        lastDepth = -1;
+
         if (!success) {
             System.out.println("Failed to create a crossword for this grid");
             return grids;
         }
 
-        grids.add(starterGrid);
+        for (int i = 0; i < gridsToGenerate; i++) {
+            success = tryWord(0, deepClone(copy));
+
+            if (success) {
+                System.out.println("\n");
+
+                for (ArrayList<Character> row : this.starterGrid) {
+                    for (Character box : row) {
+                        System.out.print(box + "  ");
+                    }
+                    System.out.println("|");
+                }
+
+                grids.add(starterGrid);
+                lastDepth = -1;
+            }
+        }
+
         return grids;
     }
 

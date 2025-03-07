@@ -1,7 +1,6 @@
 package dev.cqb13.crosswordgenerator.generator.setup;
 
 import dev.cqb13.crosswordgenerator.generator.Direction;
-import dev.cqb13.crosswordgenerator.generator.Generator;
 import dev.cqb13.crosswordgenerator.generator.WordDetails;
 
 import java.io.*;
@@ -57,7 +56,7 @@ public class WordLoader {
         return new GridSetup(shortestWord, longestWord, wordPlacementsAcross, wordPlacementsDown);
     }
 
-    public static ArrayList<Word> loadWordList(GridSetup gridSetup) throws IOException {
+    public static ArrayList<Word> loadWordList(GridSetup gridSetup, int frequency) throws IOException {
         ArrayList<Word> wordList = new ArrayList<>();
 
         ArrayList<Integer> validWordLengths = new ArrayList<>();
@@ -74,7 +73,7 @@ public class WordLoader {
 
         while(scanner.hasNextLine()) {
             String line = scanner.nextLine();
-            Word word = processLine(line, validWordLengths);
+            Word word = processLine(line, validWordLengths, frequency);
 
             if (word == null) {
                 continue;
@@ -86,7 +85,7 @@ public class WordLoader {
         return wordList;
     }
 
-    private static Word processLine(String line, ArrayList<Integer> validWordLengths) {
+    private static Word processLine(String line, ArrayList<Integer> validWordLengths, int minFrequency) {
         String[] split = line.split(",");
         assert split.length == 3;
 
@@ -95,9 +94,19 @@ public class WordLoader {
             return null;
         }
 
-        int frequency = Integer.parseInt(split[2]);
-        if(frequency < 8) return null;
+        if (
+                word.endsWith("org") ||
+                word.endsWith("xyz") ||
+                word.contains("ww") ||
+                word.contains("xx") ||
+                word.contains("yy") ||
+                word.contains("vv") || 
+                word.endsWith("com")
+        ) return null;
 
-        return new Word(word, frequency, false);
+        int wordFrequency = Integer.parseInt(split[2]);
+        if(wordFrequency < minFrequency) return null;
+
+        return new Word(word, minFrequency, false);
     }
 }
