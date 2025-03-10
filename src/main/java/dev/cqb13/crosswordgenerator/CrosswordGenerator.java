@@ -79,7 +79,7 @@ public class CrosswordGenerator extends Application {
         sizeContainer.setSpacing(5);
         HBox frequencyContainer = new HBox();
         Label frequencyLabel = new Label("Minimum word frequency (0-9): ");
-        TextField frequencyInput = new TextField(String.valueOf(8));
+        TextField frequencyInput = new TextField("8");
         frequencyInput.setMinWidth(30);
         frequencyInput.textProperty().addListener((observable, oldValue, newValue) -> {
             if (!newValue.matches("\\d*")) {
@@ -91,11 +91,26 @@ public class CrosswordGenerator extends Application {
         frequencyContainer.getChildren().addAll(frequencyLabel, frequencyInput);
         frequencyContainer.setAlignment(Pos.CENTER_LEFT);
         frequencyContainer.setSpacing(5);
+        HBox gridNumContainer = new HBox();
+        Label gridNumLabel = new Label("Number of grids (1-10): ");
+        TextField gridNumInput = new TextField("5");
+        gridNumInput.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.matches("\\d*") || newValue.isEmpty()) {
+                gridNumInput.setText(newValue.replaceAll("\\D", ""));
+            } else if(Integer.parseInt(newValue) > 10) {
+                gridNumInput.setText("10");
+            }
+        });
+        gridNumContainer.getChildren().addAll(gridNumLabel, gridNumInput);
+        gridNumContainer.setAlignment(Pos.CENTER_LEFT);
+        gridNumContainer.setSpacing(5);
+        frequencyContainer.setAlignment(Pos.CENTER_LEFT);
+        frequencyContainer.setSpacing(5);
         HBox buttonContainer = new HBox();
         Button generateButton = new Button("Generate Grid");
         generateButton.setOnAction(actionEvent -> {
             try {
-                this.generate(Integer.parseInt(frequencyInput.getText()));
+                this.generate(Integer.parseInt(frequencyInput.getText()), Integer.parseInt(gridNumInput.getText()));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -119,11 +134,10 @@ public class CrosswordGenerator extends Application {
         buttonContainer.getChildren().addAll(generateButton, clearWordsButton, clearGridButton);
         widthAndHeightContainer.setPadding(new Insets(10));
         widthAndHeightContainer.setSpacing(5);
-        widthAndHeightContainer.getChildren().addAll(sizeContainer, frequencyContainer, buttonContainer);
+        widthAndHeightContainer.getChildren().addAll(sizeContainer, frequencyContainer, gridNumContainer, buttonContainer);
         vbox.getChildren().addAll(gridpane, widthAndHeightContainer);
         horizontalCenterContainer.getChildren().add(vbox);
 
-        //TODO: add field to set the amount of grids to generate
         //TODO: add buttons to switch between grids, should looop when at end
         //TODO: add indicator with current grid and total amount of girds
 
@@ -223,7 +237,7 @@ public class CrosswordGenerator extends Application {
         this.width = width;
     }
 
-    private void generate(int frequency) throws IOException {
+    private void generate(int frequency, int gridNum) throws IOException {
         this.crosswordGrid.clear();
         for (ArrayList<TextField> row : displayGrid) {
             ArrayList<Character> newRow = new ArrayList<>();
@@ -245,7 +259,7 @@ public class CrosswordGenerator extends Application {
         System.out.println(words.size());
 
         Generator gen = new Generator(words, gridSetup, this.crosswordGrid);
-        ArrayList<ArrayList<ArrayList<Character>>> output = gen.generate(1);
+        ArrayList<ArrayList<ArrayList<Character>>> output = gen.generate(gridNum);
         System.out.println(output.getFirst());
         if(output.isEmpty()){
             Alert alert = new Alert(Alert.AlertType.ERROR, "No possible solution");

@@ -49,20 +49,6 @@ public class Generator {
     public ArrayList<ArrayList<ArrayList<Character>>> generate(int gridsToGenerate) {
         ArrayList<ArrayList<ArrayList<Character>>> grids = new ArrayList<>();
 
-        /*
-        * Step 1:
-        * Find the longest word in the grid
-        *
-        * Step 2:
-        * find all the words in the word list that fit that length and place them in an array
-        * Select the most frequent word and place it in the grid
-        * If the word cannot be placed in the grid because of letter conflicts, go back one and find the next word that fits the requirements
-        *
-        * Step 3:
-        * Goto step 1 with the next longest word
-        *
-        * */
-
         ArrayList<ArrayList<Character>> copy = deepClone(starterGrid);
         boolean success = tryWord(0, deepClone(copy));
         System.out.println("\n");
@@ -82,7 +68,7 @@ public class Generator {
             return grids;
         }
 
-        for (int i = 0; i < gridsToGenerate; i++) {
+        for (int i = 0; i < gridsToGenerate - 1; i++) {
             success = tryWord(0, deepClone(copy));
 
             if (success) {
@@ -130,7 +116,9 @@ public class Generator {
             lastDepth = wordIndex;
         }
 
+        //TODO: in word limit finder, find the start of each word length and parse from there for the words
         for (Word word : wordList) {
+            if (word.getWord().length() < currentWord.length()) break;
             if (word.getWord().length() != currentWord.length()) continue;
 
             // Make sure the word can be placed in the grid
@@ -180,7 +168,7 @@ public class Generator {
                 grid = deepClone(oldGrid);
                 word.toggleUsed();
                 if (lastDepth != wordIndex) {
-                    System.out.print("\r[" + "#".repeat(wordIndex) + " ".repeat(wordPlacements.size() - wordIndex - 1) + "] " + wordIndex + "/" + (wordPlacements.size() - 1));
+                    System.out.print("\r[" + "#".repeat(wordIndex + 1) + " ".repeat(wordPlacements.size() - wordIndex - 1) + "] " + (wordIndex + 1) + "/" + (wordPlacements.size()));
                     lastDepth = wordIndex;
                 }
             }

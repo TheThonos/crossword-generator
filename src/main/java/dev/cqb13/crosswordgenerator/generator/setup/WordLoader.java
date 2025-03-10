@@ -69,7 +69,7 @@ public class WordLoader {
                 validWordLengths.add(wordDetails.length());
             }
         });
-        Scanner scanner = new Scanner(new FileReader("src/main/resources/dev/cqb13/crosswordgenerator/words.txt"));
+        Scanner scanner = new Scanner(new FileReader("./words.txt"));
 
         while(scanner.hasNextLine()) {
             String line = scanner.nextLine();
