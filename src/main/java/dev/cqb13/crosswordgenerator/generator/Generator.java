@@ -2,28 +2,34 @@ package dev.cqb13.crosswordgenerator.generator;
 
 import dev.cqb13.crosswordgenerator.generator.setup.GridSetup;
 import dev.cqb13.crosswordgenerator.generator.setup.Word;
+import javafx.application.Platform;
+import javafx.scene.control.ProgressBar;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.concurrent.FutureTask;
+import java.util.function.Function;
 
 public class Generator {
-    private final ArrayList<Word> wordList;
+//    private final ArrayList<Word> wordList;
     private ArrayList<ArrayList<Character>> starterGrid;
-    private final ArrayList<WordDetails> wordPlacements;
+    private final ArrayList<WordPlacement> wordPlacements;
     private int lastDepth = -1;
+    private final ProgressBar progressBar;
 
-    public Generator(ArrayList<Word> wordList, GridSetup gridSetup, ArrayList<ArrayList<Character>> starterGrid) {
+    public Generator(ArrayList<Word> wordList, GridSetup gridSetup, ArrayList<ArrayList<Character>> starterGrid, ProgressBar progressBar) {
+        this.progressBar = progressBar;
         System.out.println("Across: " + gridSetup.wordPlacementsAcross().size());
         System.out.println("Down: " + gridSetup.wordPlacementsDown().size());
-        gridSetup.wordPlacementsAcross().sort(new Comparator<WordDetails>() {
+        gridSetup.wordPlacementsAcross().sort(new Comparator<WordPlacement>() {
             @Override
-            public int compare(WordDetails o1, WordDetails o2) {
+            public int compare(WordPlacement o1, WordPlacement o2) {
                 return Double.compare(Math.sqrt(o1.x() * o1.x() + o1.y() * o1.y()), Math.sqrt(o2.x() * o2.x() + o2.y() * o2.y()));
             }
         });
-        gridSetup.wordPlacementsDown().sort(new Comparator<WordDetails>() {
+        gridSetup.wordPlacementsDown().sort(new Comparator<WordPlacement>() {
             @Override
-            public int compare(WordDetails o1, WordDetails o2) {
+            public int compare(WordPlacement o1, WordPlacement o2) {
                 return Double.compare(Math.sqrt(o1.x() * o1.x() + o1.y() * o1.y()), Math.sqrt(o2.x() * o2.x() + o2.y() * o2.y()));
             }
         });
@@ -42,11 +48,44 @@ public class Generator {
             }
         }
 
-        this.wordList = wordList;
+        for (WordPlacement wordPlacement : wordPlacements) {
+            for (Word word : wordList) {
+                if (wordFitsCharacterRequirements(word.getWord(), wordPlacement.wordCharacter())) {
+                    wordPlacement.words().add(word);
+                }
+            }
+
+            if (wordPlacement.words().isEmpty()) {
+                System.out.format("No words can fit in the word at x: %s y:%s", wordPlacement.x(), wordPlacement.y());
+                System.exit(1);
+            }
+        }
+
+//        this.wordList = wordList;
         this.starterGrid = starterGrid;
     }
 
-    public ArrayList<ArrayList<ArrayList<Character>>> generate(int gridsToGenerate) {
+    private static boolean wordFitsCharacterRequirements(String word, ArrayList<Character> characterRequirements) {
+        char[] splitWord = word.toCharArray();
+
+        if (splitWord.length != characterRequirements.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < splitWord.length; i++) {
+            if (characterRequirements.get(i) == '-') continue;
+            if(!characterRequirements.get(i).toString().equals(characterRequirements.get(i).toString().toLowerCase())) throw new RuntimeException("its uppercase");
+
+            if (characterRequirements.get(i) != splitWord[i]) {
+                return false;
+            }
+        }
+
+
+        return true;
+    }
+
+    public void generate(int gridsToGenerate, Function<ArrayList<ArrayList<ArrayList<Character>>>, Void> callback) {
         ArrayList<ArrayList<ArrayList<Character>>> grids = new ArrayList<>();
 
         ArrayList<ArrayList<Character>> copy = deepClone(starterGrid);
@@ -65,28 +104,47 @@ public class Generator {
 
         if (!success) {
             System.out.println("Failed to create a crossword for this grid");
-            return grids;
+            callback.apply(new ArrayList<>());
+            return;
         }
 
-        for (int i = 0; i < gridsToGenerate - 1; i++) {
-            success = tryWord(0, deepClone(copy));
+        updateProgressBar(0, grids, gridsToGenerate, copy, callback);
+    }
 
-            if (success) {
-                System.out.println("\n");
+    private void generateGrid(int i, ArrayList<ArrayList<ArrayList<Character>>> grids, int gridsToGenerate, ArrayList<ArrayList<Character>> copy, Function<ArrayList<ArrayList<ArrayList<Character>>>, Void> callback) {
+        boolean success = tryWord(0, deepClone(copy));
 
-                for (ArrayList<Character> row : this.starterGrid) {
-                    for (Character box : row) {
-                        System.out.print(box + "  ");
-                    }
-                    System.out.println("|");
+        if (success) {
+            System.out.println("\n");
+
+            for (ArrayList<Character> row : this.starterGrid) {
+                for (Character box : row) {
+                    System.out.print(box + "  ");
                 }
-
-                grids.add(starterGrid);
-                lastDepth = -1;
+                System.out.println("|");
             }
-        }
 
-        return grids;
+            grids.add(starterGrid);
+            lastDepth = -1;
+            updateProgressBar(i, grids, gridsToGenerate, copy, callback);
+        }
+    }
+
+    private FutureTask<Void> updateProgressBar(int i, ArrayList<ArrayList<ArrayList<Character>>> grids, int total, ArrayList<ArrayList<Character>> copy, Function<ArrayList<ArrayList<ArrayList<Character>>>, Void> callback) {
+        FutureTask<Void> updateProgressBarTask = new FutureTask<Void>(() -> {
+            progressBar.setProgress((i + 1.0) / total);
+
+            if(i + 1 == total) {
+                callback.apply(grids);
+            } else {
+                generateGrid(i + 1, grids, total, copy, callback);
+            }
+        }, null);
+
+        Platform.runLater(updateProgressBarTask);
+
+
+        return updateProgressBarTask;
     }
 
     public static ArrayList<ArrayList<Character>> deepClone(ArrayList<ArrayList<Character>> grid) {
@@ -110,16 +168,12 @@ public class Generator {
 
     private boolean tryWord(int wordIndex, ArrayList<ArrayList<Character>> oldGrid) {
         ArrayList<ArrayList<Character>> grid = deepClone(oldGrid);
-        WordDetails currentWord = wordPlacements.get(wordIndex);
-        if (lastDepth != wordIndex) {
-            System.out.print("\r[" + "#".repeat(wordIndex + 1) + " ".repeat(wordPlacements.size() - wordIndex - 1) + "] " + (wordIndex + 1) + "/" + (wordPlacements.size()));
-            lastDepth = wordIndex;
-        }
+        WordPlacement currentWord = wordPlacements.get(wordIndex);
 
-        //TODO: in word limit finder, find the start of each word length and parse from there for the words
-        for (Word word : wordList) {
+        for (Word word : wordPlacements.get(wordIndex).words()) {
             if (word.getWord().length() < currentWord.length()) break;
             if (word.getWord().length() != currentWord.length()) continue;
+            if (word.getUsed()) continue;
 
             // Make sure the word can be placed in the grid
             boolean wordWorks = true;
@@ -141,7 +195,7 @@ public class Generator {
                 }
             }
 
-            if (!wordWorks || word.getUsed()) {
+            if (!wordWorks) {
                 continue;
             }
 

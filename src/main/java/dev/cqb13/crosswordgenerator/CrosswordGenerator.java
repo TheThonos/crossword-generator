@@ -33,12 +33,17 @@ public class CrosswordGenerator extends Application {
     private ArrayList<ArrayList<Character>> crosswordGrid;
     private final String WHITE_STYLE = "-fx-control-inner-background: #FFFFFF";
     private final String BLACK_STYLE = "-fx-control-inner-background: #000000";
+    private ArrayList<ArrayList<ArrayList<Character>>> generatedGrids = new ArrayList<>();
+    private int currentGridIndex;
+    private ProgressBar progressBar;
+    private Label gridsNumLabel;
 
     @Override
     public void start(Stage stage) {
         crosswordGrid = new ArrayList<>();
         this.gridpane = new GridPane();
         HBox vbox = new HBox();
+        vbox.setPadding(new Insets(25));
         vbox.setAlignment(Pos.CENTER);
         HBox horizontalCenterContainer = new HBox();
         horizontalCenterContainer.setAlignment(Pos.CENTER);
@@ -109,6 +114,8 @@ public class CrosswordGenerator extends Application {
         HBox buttonContainer = new HBox();
         Button generateButton = new Button("Generate Grid");
         generateButton.setOnAction(actionEvent -> {
+            currentGridIndex = 0;
+            generatedGrids = new ArrayList<>();
             try {
                 this.generate(Integer.parseInt(frequencyInput.getText()), Integer.parseInt(gridNumInput.getText()));
             } catch (IOException e) {
@@ -121,6 +128,8 @@ public class CrosswordGenerator extends Application {
                 TextField textField = (TextField) node;
                 textField.textProperty().setValue("");
             });
+            currentGridIndex = 0;
+            generatedGrids = new ArrayList<>();
         });
         Button clearGridButton = new Button("Clear Grid");
         clearGridButton.setOnAction(actionEvent -> {
@@ -128,18 +137,38 @@ public class CrosswordGenerator extends Application {
                 TextField textField = (TextField) node;
                 textField.textProperty().setValue("");
                 textField.setStyle(WHITE_STYLE);
+                textField.setEditable(true);
             });
+            currentGridIndex = 0;
+            generatedGrids = new ArrayList<>();
         });
         buttonContainer.setSpacing(5);
         buttonContainer.getChildren().addAll(generateButton, clearWordsButton, clearGridButton);
+        HBox progressBarContainer = new HBox();
+        progressBar = new ProgressBar();
+        progressBar.setProgress(0);
+        progressBarContainer.setAlignment(Pos.CENTER_LEFT);
+        progressBarContainer.getChildren().add(progressBar);
+        HBox gridChangeContainer = new HBox();
+        Button leftButton = new Button("<");
+        leftButton.setOnAction(actionEvent -> {
+            goLeft();
+        });
+        gridsNumLabel = new Label(currentGridIndex + "/" + generatedGrids.size());
+        Button rightButton = new Button(">");
+        rightButton.setOnAction(actionEvent -> {
+            goRight();
+        });
+        gridChangeContainer.setSpacing(5);
+        gridChangeContainer.setAlignment(Pos.CENTER_LEFT);
+        gridChangeContainer.getChildren().addAll(leftButton, gridsNumLabel, rightButton);
         widthAndHeightContainer.setPadding(new Insets(10));
         widthAndHeightContainer.setSpacing(5);
-        widthAndHeightContainer.getChildren().addAll(sizeContainer, frequencyContainer, gridNumContainer, buttonContainer);
+        widthAndHeightContainer.getChildren().addAll(sizeContainer, frequencyContainer, gridNumContainer, buttonContainer, progressBarContainer, gridChangeContainer);
+
         vbox.getChildren().addAll(gridpane, widthAndHeightContainer);
         horizontalCenterContainer.getChildren().add(vbox);
 
-        //TODO: add buttons to switch between grids, should looop when at end
-        //TODO: add indicator with current grid and total amount of girds
 
         stage.setTitle("Crossword Generator");
         stage.setScene(scene);
@@ -207,7 +236,7 @@ public class CrosswordGenerator extends Application {
                 col.subList(width, this.width).clear();
             }
         }
-        if(width > this.width) {
+        if (width > this.width) {
             for(int x = this.width; x < width; x++){
                 ArrayList<TextField> column = new ArrayList<>();
                 for(int y = 0; y < this.width; y++) {
@@ -255,23 +284,59 @@ public class CrosswordGenerator extends Application {
 
         GridSetup gridSetup = WordLoader.findLimits(this.crosswordGrid);
 
-        ArrayList<Word> words = WordLoader.loadWordList(gridSetup, frequency);
-        System.out.println(words.size());
+        ArrayList<Word> wordList = WordLoader.loadWordList(gridSetup, frequency);
 
-        Generator gen = new Generator(words, gridSetup, this.crosswordGrid);
-        ArrayList<ArrayList<ArrayList<Character>>> output = gen.generate(gridNum);
-        System.out.println(output.getFirst());
-        if(output.isEmpty()){
-            Alert alert = new Alert(Alert.AlertType.ERROR, "No possible solution");
-            Optional<ButtonType> result = alert.showAndWait();
-            if (result.isPresent() && result.get() == ButtonType.OK) {
-                return;
+
+        Generator gen = new Generator(wordList, gridSetup, this.crosswordGrid, this.progressBar);
+        gen.generate(gridNum, (ArrayList<ArrayList<ArrayList<Character>>> grids) -> {
+            if(grids.isEmpty()){
+                Alert alert = new Alert(Alert.AlertType.ERROR, "No possible solution");
+                Optional<ButtonType> result = alert.showAndWait();
+                if (result.isPresent() && result.get() == ButtonType.OK) {
+                    return null;
+                }
+            } else {
+
             }
+            fillInGrid(grids.getFirst());
+
+            generatedGrids = grids;
+            currentGridIndex = 0;
+            gridsNumLabel.setText(currentGridIndex + 1 + "/" + generatedGrids.size());
+            return null;
+        });
+    }
+
+    private void goLeft() {
+        if (generatedGrids.size() <= 1) return;
+
+        if (currentGridIndex == 0) {
+            currentGridIndex = generatedGrids.size() - 1;
+        } else {
+            currentGridIndex--;
         }
 
+        fillInGrid(generatedGrids.get(currentGridIndex));
+        gridsNumLabel.setText(currentGridIndex + 1 + "/" + generatedGrids.size());
+    }
+
+    private void goRight() {
+        if (generatedGrids.size() <= 1) return;
+
+        if (currentGridIndex == generatedGrids.size() - 1) {
+            currentGridIndex = 0;
+        } else {
+            currentGridIndex++;
+        }
+
+        fillInGrid(generatedGrids.get(currentGridIndex));
+        gridsNumLabel.setText(currentGridIndex + 1 + "/" + generatedGrids.size());
+    }
+
+    private void fillInGrid(ArrayList<ArrayList<Character>> grid) {
         gridpane.getChildren().forEach(node -> {
             TextField textField = (TextField) node;
-            textField.textProperty().setValue(output.getFirst().get(GridPane.getRowIndex(node)).get(GridPane.getColumnIndex(node)).toString());
+            textField.textProperty().setValue(grid.get(GridPane.getRowIndex(node)).get(GridPane.getColumnIndex(node)).toString());
         });
 
     }
